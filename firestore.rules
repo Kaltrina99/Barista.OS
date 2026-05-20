@@ -1,0 +1,171 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitive Definitions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Pillar 2: Validation Blueprints
+    function isValidInventoryItem(data) {
+      return data.keys().hasAll(['id', 'name', 'quantity', 'unit', 'threshold', 'lastStockUpdate', 'locationId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.quantity is number && data.quantity >= 0 &&
+             data.unit is string && data.unit.size() <= 50 &&
+             data.threshold is number && data.threshold >= 0 &&
+             data.locationId is string &&
+             (!('price' in data) || (data.price is number && data.price >= 0)) &&
+             (!('supplier' in data) || (data.supplier is string && data.supplier.size() <= 200)) &&
+             data.lastStockUpdate is string;
+    }
+
+    function isValidRestockRecord(data) {
+      return data.keys().hasAll(['id', 'timestamp', 'itemsRestocked', 'source', 'totalCost']) &&
+             data.id is string &&
+             data.timestamp is string &&
+             data.itemsRestocked is list &&
+             data.source is string && data.source.size() <= 200 &&
+             data.totalCost is number;
+    }
+
+    function isValidSalesRecord(data) {
+      return data.keys().hasAll(['id', 'timestamp', 'itemsSold', 'status']) &&
+             data.keys().size() >= 4 &&
+             data.id is string && data.id.size() <= 128 &&
+             data.timestamp is string &&
+             data.itemsSold is list && data.itemsSold.size() > 0 && data.itemsSold.size() <= 50 &&
+             data.status in ['processed', 'pending'];
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'subscriptionTier', 'isApproved', 'createdAt', 'lastActive', 'role']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.subscriptionTier in ['free', 'basic', 'pro', 'enterprise'] &&
+             data.isApproved is bool &&
+             data.role in ['superadmin', 'tenant'] &&
+             data.createdAt is string &&
+             data.lastActive is string &&
+             (!('enabledTabs' in data) || data.enabledTabs is list);
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'kaltrina99a@gmail.com' ||
+        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.get('role', 'tenant') == 'superadmin')
+      );
+    }
+
+    // Global profiles collection for Super Admin visibility
+    match /profiles/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      
+      allow create: if isOwner(userId) && 
+                    isValidUserProfile(incoming()) &&
+                    incoming().role == (request.auth.token.email == 'kaltrina99a@gmail.com' ? 'superadmin' : 'tenant') &&
+                    incoming().isApproved == (request.auth.token.email == 'kaltrina99a@gmail.com');
+      
+      allow update: if isAdmin() || (isOwner(userId) && (
+        // Regular users can only update safe fields
+        incoming().diff(existing()).affectedKeys().hasOnly(['lastActive', 'activeLocationId', 'displayName', 'photoURL'])
+      ));
+      
+      allow delete: if isAdmin();
+    }
+
+    match /global_inventory/{itemId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+
+      match /profile/data {
+        allow get: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidUserProfile(incoming());
+        allow update: if (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['lastActive', 'activeLocationId', 'impersonatingUid'])) ||
+                      isAdmin();
+      }
+
+      match /locations/{locationId} {
+        allow list, get: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+      
+      match /inventory/{itemId} {
+        allow list: if isOwner(userId) || isAdmin();
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(itemId);
+        
+        allow create: if (isOwner(userId) || isAdmin()) && 
+                        isValidId(itemId) && 
+                        isValidInventoryItem(incoming());
+        
+        allow update: if (isOwner(userId) || isAdmin()) && 
+                        isValidId(itemId) && 
+                        // isValidInventoryItem(incoming()) && // We might relax this for partial updates if needed, but Pillar 2 says call on both
+                        (
+                          // Action: General Update or Manual Adjustment
+                          isAdmin() || incoming().diff(existing()).affectedKeys().hasOnly(['name', 'quantity', 'unit', 'threshold', 'lastStockUpdate', 'price', 'supplier', 'locationId', 'isVisibleToTenants'])
+                        );
+                        
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /sales/{saleId} {
+        allow list: if isOwner(userId) || isAdmin();
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(saleId);
+        
+        allow create: if (isOwner(userId) || isAdmin()) && 
+                        isValidId(saleId) && 
+                        isValidSalesRecord(incoming());
+                        
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /restocks/{restockId} {
+        allow list: if isOwner(userId) || isAdmin();
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(restockId);
+        
+        allow create: if (isOwner(userId) || isAdmin()) && 
+                        isValidId(restockId) && 
+                        isValidRestockRecord(incoming());
+                        
+        allow update: if false; 
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /stock_history/{recordId} {
+        allow list: if isOwner(userId) || isAdmin();
+        allow get: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) || isAdmin();
+        allow delete: if isAdmin();
+      }
+    }
+  }
+}

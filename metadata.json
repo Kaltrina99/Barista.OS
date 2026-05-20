@@ -1,0 +1,10 @@
+{
+  "name": "Barista Stock Master",
+  "description": "Enterprise-grade multi-tenant inventory SaaS for coffee chains. Features AI-powered stock auditing, market intelligence, multi-location support, and a Super Admin control center for tenant feature provisioning (tab-based configuration).",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

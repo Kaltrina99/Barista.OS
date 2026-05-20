@@ -1,0 +1,70 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile with role and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "subscriptionTier": { "type": "string", "enum": ["free", "basic", "pro", "enterprise"] },
+        "isApproved": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["superadmin", "tenant"] },
+        "activeLocationId": { "type": "string" },
+        "impersonatingUid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastActive": { "type": "string", "format": "date-time" },
+        "enabledTabs": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["uid", "email", "subscriptionTier", "isApproved", "role", "createdAt", "lastActive"]
+    },
+    "Location": {
+      "title": "Location",
+      "description": "Physical branch location for a tenant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "address", "createdAt"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Stock item at a specific location",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "threshold": { "type": "number" },
+        "price": { "type": "number" },
+        "supplier": { "type": "string" },
+        "locationId": { "type": "string" },
+        "lastStockUpdate": { "type": "string", "format": "date-time" },
+        "isVisibleToTenants": { "type": "boolean" }
+      },
+      "required": ["id", "name", "quantity", "unit", "threshold", "price", "locationId", "lastStockUpdate"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/profile/data": {
+      "schema": "UserProfile",
+      "description": "User profile data"
+    },
+    "/users/{userId}/locations/{locationId}": {
+      "schema": "Location",
+      "description": "Tenant locations"
+    },
+    "/users/{userId}/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Inventory items per tenant/location"
+    },
+    "/profiles/{userId}": {
+      "schema": "UserProfile",
+      "description": "Global profiles for superadmin access"
+    }
+  }
+}
