@@ -14,7 +14,8 @@ import {
   History,
   Lock,
   Unlock,
-  AlertCircle
+  AlertCircle,
+  Globe
 } from 'lucide-react';
 import { UserProfile, AppTab } from '../../../types';
 import { inventoryService, auth } from '../../../services/inventoryService';
@@ -45,6 +46,7 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
         market: true,
         requisition: true,
         history: true,
+        intel: true,
         canAddItems: true,
         canEditItems: true,
         canDeleteItems: true,
@@ -78,6 +80,7 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
       if (localPermissions.market) enabledTabs.push('market');
       if (localPermissions.requisition) enabledTabs.push('requisition');
       if (localPermissions.history) enabledTabs.push('history');
+      if (localPermissions.intel) enabledTabs.push('intel');
 
       await onUpdatePermissions(selectedUser.uid, { 
         permissions: localPermissions,
@@ -283,6 +286,13 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
                       state={localPermissions.history}
                       onToggle={() => togglePermission('history')}
                       description="Activity logs and audit trails"
+                    />
+                    <PermissionToggle 
+                      label="Region Intel" 
+                      icon={Globe} 
+                      state={localPermissions.intel}
+                      onToggle={() => togglePermission('intel')}
+                      description="Inflation rates & wholesale recommenders"
                     />
                   </div>
                 </section>

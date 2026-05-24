@@ -96,6 +96,7 @@ export interface UserProfile {
       market: boolean;
       requisition: boolean;
       history: boolean;
+      intel: boolean;
       canAddItems: boolean;
       canEditItems: boolean;
       canDeleteItems: boolean;

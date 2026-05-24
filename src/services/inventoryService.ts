@@ -271,6 +271,7 @@ export const inventoryService = {
           market: true,
           requisition: true,
           history: true,
+          intel: true,
           canAddItems: true,
           canEditItems: true,
           canDeleteItems: true,
@@ -391,6 +392,7 @@ export const inventoryService = {
         market: true,
         requisition: true,
         history: true,
+        intel: true,
         canAddItems: true,
         canEditItems: true,
         canDeleteItems: true,
@@ -407,7 +409,7 @@ export const inventoryService = {
         activeLocationId: 'default',
         createdAt: new Date().toISOString(),
         lastActive: new Date().toISOString(),
-        enabledTabs: ['dashboard', 'inventory', 'market', 'requisition', 'history'],
+        enabledTabs: ['dashboard', 'inventory', 'market', 'requisition', 'history', 'intel'],
         permissions: defaultPermissions
       };
       await setDoc(doc(db, "users", user.uid, "profile", "data"), newProfile);
