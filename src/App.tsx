@@ -22,7 +22,8 @@ import {
   Settings,
   MapPin,
   ShieldAlert,
-  LogOut
+  LogOut,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subDays } from 'date-fns';
@@ -56,6 +57,7 @@ import { PermissionManager } from './components/features/Admin/PermissionManagem
 import { AuthScreen } from './components/features/Auth/AuthScreen';
 import { ManualControls } from './components/features/Inventory/ManualControls';
 import { RequisitionQueue } from './components/features/Inventory/RequisitionQueue';
+import { RegionIntel } from './components/features/Inventory/RegionIntel';
 import { AdminPanel } from './components/features/Admin/AdminPanel';
 import { CameraOverlay } from './components/shared/CameraOverlay';
 
@@ -75,7 +77,7 @@ export default function App() {
   const [isManualRestockOpen, setIsManualRestockOpen] = useState(false);
   const [isManualSaleOpen, setIsManualSaleOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'history' | 'requisition' | 'market' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'history' | 'requisition' | 'market' | 'admin' | 'intel'>('dashboard');
   const [analyzedItems, setAnalyzedItems] = useState<SoldItem[] | null>(null);
   const [analyzedRestockItems, setAnalyzedRestockItems] = useState<SoldItem[] | null>(null);
   const [isResourceIntelOpen, setIsResourceIntelOpen] = useState(false);
@@ -909,6 +911,20 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'intel' && (
+            <RegionIntel
+              locations={locations}
+              activeLocationId={profile?.activeLocationId || 'default'}
+              onUpdateLocationRegion={async (locationId, country, region) => {
+                if (!profile) return;
+                const targetUid = profile.impersonatingUid || profile.uid;
+                await inventoryService.updateLocation(targetUid, locationId, { country, region });
+                refreshData();
+              }}
+              profile={profile}
+            />
+          )}
+
           {activeTab === 'admin' && isSuperAdmin && (
             <AdminPanel 
               isAdminLoading={isAdminLoading}
@@ -959,6 +975,9 @@ export default function App() {
            )}
            {(isSuperAdmin || profile?.enabledTabs?.includes('requisition')) && (
              <MobileNavTab active={activeTab === 'requisition'} onClick={() => setActiveTab('requisition')} icon={<ShoppingBag size={22}/>} label="Orders" />
+            )}
+            {(isSuperAdmin || !profile?.enabledTabs || profile?.enabledTabs?.includes('intel')) && (
+              <MobileNavTab active={activeTab === 'intel'} onClick={() => setActiveTab('intel')} icon={<Globe size={22}/>} label="Intel" />
            )}
            {isSuperAdmin ? (
              <MobileNavTab active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon={<ShieldCheck size={22}/>} label="Admin" />

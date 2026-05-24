@@ -482,7 +482,11 @@ export const inventoryService = {
 
   updateLocation: async (uid: string, locationId: string, updates: Partial<Location>) => {
     try {
-      await updateDoc(doc(db, "users", uid, "locations", locationId), updates);
+      const defaultFields = locationId === 'primary-node' ? { name: 'Main Branch', createdAt: new Date().toISOString() } : {};
+      await setDoc(doc(db, "users", uid, "locations", locationId), {
+        ...defaultFields,
+        ...updates
+      }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${uid}/locations/${locationId}`);
     }

@@ -11,7 +11,8 @@ import {
   ShieldCheck, 
   LogOut,
   Plus,
-  CreditCard
+  CreditCard,
+  Globe
 } from 'lucide-react';
 import { calculateSubscriptionPrice } from '../../utils/pricing';
 
@@ -39,6 +40,7 @@ export const Sidebar = ({
     { id: 'inventory', label: 'Supply', icon: Package, enabled: isSuperAdmin || profile?.enabledTabs?.includes('inventory') },
     { id: 'market', label: 'Pricing', icon: TrendingUp, enabled: isSuperAdmin || profile?.enabledTabs?.includes('market') },
     { id: 'requisition', label: 'Orders', icon: ShoppingBag, enabled: isSuperAdmin || profile?.enabledTabs?.includes('requisition') },
+    { id: 'intel', label: 'Region Intel', icon: Globe, enabled: isSuperAdmin || !profile?.enabledTabs || profile?.enabledTabs?.includes('intel') },
     { id: 'history', label: 'Audits', icon: History, enabled: isSuperAdmin || profile?.enabledTabs?.includes('history') },
     { id: 'admin', label: 'Super Admin', icon: ShieldCheck, enabled: isSuperAdmin },
   ];

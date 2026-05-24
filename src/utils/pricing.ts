@@ -26,6 +26,11 @@ export const FEATURE_INFO: Record<AppTab, { name: string; price: number; descrip
     price: 15.00,
     description: 'Traceable operations logs and printable action histories.'
   },
+  intel: {
+    name: 'Region Intel',
+    price: 20.00,
+    description: 'Search-grounded local inflation rates and direct wholesale supplier recommendations.'
+  },
 };
 
 /**
@@ -47,7 +52,7 @@ export function calculateSubscriptionPrice(profile: UserProfile | null | undefin
   const isSuper = profile.role === 'superadmin';
   const isFree = profile.subscriptionTier === 'free';
 
-  const defaultTabs: AppTab[] = ['dashboard', 'inventory', 'requisition', 'history'];
+  const defaultTabs: AppTab[] = ['dashboard', 'inventory', 'requisition', 'history', 'intel'];
   const activeTabs = profile.enabledTabs || defaultTabs;
 
   const breakdown = activeTabs.map(tab => ({

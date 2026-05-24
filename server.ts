@@ -259,6 +259,77 @@ apiRouter.post("/gemini/identify", async (req, res) => {
   }
 });
 
+apiRouter.post("/gemini/market-intel", async (req, res) => {
+  const { country, region } = req.body;
+  if (!country) {
+    return res.status(400).json({ error: "Country is required" });
+  }
+
+  try {
+    const prompt = `You are a café operations research assistant.
+Conduct a real-time market search to provide key macroeconomics, inflation figures, and recommended wholesale suppliers or local distributors for café resources (beans, milk, sugar, cups, etc.) operating in:
+Country: ${country}
+Region/City: ${region || "Any Major City"}
+
+Return exactly a JSON object matching the requested schema. Ensure all data is realistically grounded, using Google Search to fetch actual, current inflation rates and actual wholesalers or wholesale alternatives in ${country} with real prices if found.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            country: { type: Type.STRING },
+            inflationRate: { type: Type.NUMBER },
+            cafeInflationRate: { type: Type.NUMBER },
+            inflationOutlook: { type: Type.STRING },
+            categoryPriceChanges: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  category: { type: Type.STRING },
+                  changePercent: { type: Type.NUMBER },
+                  status: { type: Type.STRING }
+                },
+                required: ["category", "changePercent", "status"]
+              }
+            },
+            recommendedSuppliers: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  specialty: { type: Type.STRING },
+                  pricePosition: { type: Type.STRING },
+                  whyGreatValue: { type: Type.STRING },
+                  estimatedSaving: { type: Type.STRING },
+                  websiteUrl: { type: Type.STRING }
+                },
+                required: ["name", "specialty", "pricePosition", "whyGreatValue", "estimatedSaving", "websiteUrl"]
+              }
+            }
+          },
+          required: ["country", "inflationRate", "cafeInflationRate", "inflationOutlook", "categoryPriceChanges", "recommendedSuppliers"]
+        }
+      }
+    });
+
+    if (!response.text) {
+      throw new Error("Empty response from Gemini");
+    }
+
+    res.json(JSON.parse(response.text));
+  } catch (error) {
+    console.error("Market Intel Error:", error);
+    res.status(500).json({ error: "Failed to generate market intelligence", details: error instanceof Error ? error.message : String(error) });
+  }
+});
+
 apiRouter.get("/inventory", async (req, res) => {
   const uid = req.headers['x-user-id'] as string || 'default';
   const data = await getData(uid, 'inventory');

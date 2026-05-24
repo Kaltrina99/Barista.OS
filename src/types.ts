@@ -14,6 +14,8 @@ export interface Location {
   id: string;
   name: string;
   createdAt: string;
+  country?: string;
+  region?: string;
 }
 
 export interface InventoryItem {
@@ -68,7 +70,7 @@ export interface StockHistoryRecord {
 }
 
 export type SubscriptionTier = 'free' | 'basic' | 'pro' | 'enterprise';
-export type AppTab = 'dashboard' | 'inventory' | 'market' | 'requisition' | 'history';
+export type AppTab = 'dashboard' | 'inventory' | 'market' | 'requisition' | 'history' | 'intel';
 
 export interface AppTheme {
   primaryColor: string; // Tailwind color key or hex
