@@ -165,9 +165,9 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
           
           <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
             {filteredTenants.length > 0 ? (
-              filteredTenants.map(tenant => (
+              filteredTenants.map((tenant, idx) => (
                 <button
-                  key={tenant.uid}
+                  key={`${tenant.uid || 'tenant'}-${idx}`}
                   onClick={() => setSelectedUser(tenant)}
                   className={cn(
                     "w-full p-4 rounded-3xl border transition-all text-left flex items-center gap-4 group",

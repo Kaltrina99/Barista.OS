@@ -6,6 +6,9 @@
   --font-serif: "Playfair Display", serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
+  --color-brand-primary: var(--primary-accent, #5A5A40);
+  --color-brand-secondary: var(--secondary-accent, #C88D67);
+  
   --animate-spin-slow: spin 3s linear infinite;
 }
 

@@ -347,20 +347,35 @@ export const inventoryService = {
 
   getAllTenants: async (): Promise<UserProfile[]> => {
     // Call our new Node backend API to bypass client permission issues and allow local fallback
+    let serverTenants: UserProfile[] = [];
     try {
       const response = await fetch('/api/tenants');
-      if (!response.ok) throw new Error('Failed to fetch tenants');
-      return await response.json();
+      if (response.ok) {
+        const data = await response.json();
+        serverTenants = Array.isArray(data) ? data : [];
+      }
     } catch (error) {
       console.error("Error fetching tenants from server:", error);
-      // Minimal fallback to Firebase client if API fails
-      try {
-        const snapshot = await getDocs(collection(db, "profiles"));
-        return snapshot.docs.map(doc => doc.data() as UserProfile);
-      } catch (fbError) {
-        console.error("Firebase fallback also failed:", fbError);
-        return [];
-      }
+    }
+
+    // Always fetch from Firestore as the source of truth if we can, then merge
+    try {
+      const snapshot = await getDocs(collection(db, "profiles"));
+      const firestoreTenants = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
+      
+      // Merge results, Firestore takes precedence for overlapping UIDs
+      const tenantMap = new Map<string, UserProfile>();
+      serverTenants.forEach(t => {
+        if (t && t.uid) tenantMap.set(t.uid, t);
+      });
+      firestoreTenants.forEach(t => {
+        if (t && t.uid) tenantMap.set(t.uid, t);
+      });
+      
+      return Array.from(tenantMap.values());
+    } catch (fbError) {
+      console.error("Firebase fetch failed in getAllTenants:", fbError);
+      return serverTenants.filter(t => t && t.uid); 
     }
   },
 
@@ -427,10 +442,22 @@ export const inventoryService = {
     const path = `users/${targetUid}/locations`;
     try {
       const snapshot = await getDocs(collection(db, path));
-      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Location));
+      const locMap = new Map<string, Location>();
+      snapshot.docs.forEach(doc => {
+        const id = doc.id;
+        if (id) {
+          locMap.set(id, { ...doc.data(), id } as Location);
+        }
+      });
+      // Ensure at least a default location exists in memory if empty 
+      // AND use a stable ID to prevent random duplicate keys if multiple components fetch
+      if (locMap.size === 0) {
+        locMap.set('primary-node', { id: 'primary-node', name: 'Main Branch', createdAt: new Date().toISOString() });
+      }
+      return Array.from(locMap.values());
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
-      return [];
+      return [{ id: 'primary-node', name: 'Main Branch', createdAt: new Date().toISOString() }];
     }
   },
 

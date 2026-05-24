@@ -79,8 +79,8 @@ export const LocationManager: React.FC<LocationManagerProps> = ({
             Active Infrastructure
           </h4>
           <div className="grid gap-3">
-            {locations.map(loc => (
-              <div key={loc.id} className="flex items-center justify-between p-5 bg-white border border-[#E8E2D9] rounded-[24px] group hover:border-[#5A5A40] transition-all">
+            {locations.map((loc, idx) => (
+              <div key={`${loc.id}-${idx}`} className="flex items-center justify-between p-5 bg-white border border-[#E8E2D9] rounded-[24px] group hover:border-[#5A5A40] transition-all">
                 <div className="flex-1 mr-4">
                   {editingId === loc.id ? (
                     <input 

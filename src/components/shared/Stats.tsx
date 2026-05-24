@@ -13,9 +13,9 @@ interface CompactStatProps {
 
 export const CompactStat = memo(({ title, value, label, trend, icon, color }: CompactStatProps) => {
   const themes = {
-    accent: "bg-[#5A5A40]/5 border-[#5A5A40]/10 text-[#5A5A40]",
+    accent: "bg-brand-primary/5 border-brand-primary/10 text-brand-primary",
     danger: "bg-red-50 border-red-100 text-red-700",
-    warm: "bg-amber-50 border-amber-100 text-amber-700"
+    warm: "bg-brand-secondary/5 border-brand-secondary/10 text-brand-secondary"
   };
 
   return (
@@ -48,13 +48,15 @@ interface ActionButtonProps {
   color?: string;
 }
 
-export const ActionButton = memo(({ onClick, title, icon, label, color = "#5A5A40" }: ActionButtonProps) => (
+export const ActionButton = memo(({ onClick, title, icon, label, color }: ActionButtonProps) => (
   <button 
     onClick={onClick}
-    className="group relative flex flex-col items-center justify-center p-10 bg-white border border-[#E8E2D9] rounded-[48px] hover:border-[#5A5A40] hover:shadow-xl hover:-translate-y-1 transition-all w-full overflow-hidden"
+    className="group relative flex flex-col items-center justify-center p-10 bg-white border border-[#E8E2D9] rounded-[48px] hover:border-brand-primary hover:shadow-xl hover:-translate-y-1 transition-all w-full overflow-hidden"
   >
-    <div className="absolute inset-0 bg-[#5A5A40]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-    <div className="w-20 h-20 rounded-[32px] mb-6 flex items-center justify-center transition-all group-hover:scale-110 shadow-lg" style={{ backgroundColor: color + '15', color }}>
+    <div className="absolute inset-0 bg-brand-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+    <div 
+      className="w-20 h-20 rounded-[32px] mb-6 flex items-center justify-center transition-all group-hover:scale-110 shadow-lg text-brand-primary bg-brand-primary/15"
+    >
       {icon}
     </div>
     <span className="text-xl font-serif text-[#2D2A26] italic mb-1 lowercase">{title}.</span>

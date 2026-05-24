@@ -21,7 +21,8 @@ import {
   ArrowUpRight,
   Settings,
   MapPin,
-  ShieldAlert
+  ShieldAlert,
+  LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subDays } from 'date-fns';
@@ -44,6 +45,7 @@ import { cn } from './lib/utils';
 import { Modal, InputGroup } from './components/shared/Modals';
 import { CompactStat, ActionButton } from './components/shared/Stats';
 import { NavTab, MobileNavTab } from './components/layout/Navigation';
+import { Sidebar } from './components/layout/Sidebar';
 import { Overview } from './components/features/Dashboard/Overview';
 import { SupplyGrid } from './components/features/Inventory/SupplyGrid';
 import { MarketWatch } from './components/features/Market/MarketWatch';
@@ -53,6 +55,7 @@ import { LocationManager } from './components/features/Admin/LocationManager';
 import { PermissionManager } from './components/features/Admin/PermissionManagement';
 import { AuthScreen } from './components/features/Auth/AuthScreen';
 import { ManualControls } from './components/features/Inventory/ManualControls';
+import { RequisitionQueue } from './components/features/Inventory/RequisitionQueue';
 import { AdminPanel } from './components/features/Admin/AdminPanel';
 import { CameraOverlay } from './components/shared/CameraOverlay';
 
@@ -67,7 +70,7 @@ export default function App() {
   const [isProcessingSales, setIsProcessingSales] = useState(false);
   const [isProcessingRestock, setIsProcessingRestock] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [cameraPurpose, setCameraPurpose] = useState<'sale' | 'restock'>('sale');
+  const [cameraPurpose, setCameraPurpose] = useState<'sale' | 'restock' | 'intel'>('sale');
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isManualRestockOpen, setIsManualRestockOpen] = useState(false);
   const [isManualSaleOpen, setIsManualSaleOpen] = useState(false);
@@ -109,6 +112,13 @@ export default function App() {
   const isSuperAdmin = useMemo(() => {
     return user?.email === 'kaltrina99a@gmail.com' || profile?.role === 'superadmin';
   }, [user, profile]);
+
+  const activeThemeProfile = useMemo(() => {
+    if (profile?.impersonatingUid && allTenants.length > 0) {
+      return allTenants.find(t => t.uid === profile.impersonatingUid) || profile;
+    }
+    return profile;
+  }, [profile, allTenants]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -229,9 +239,9 @@ export default function App() {
   }, [profile, newLocation]);
 
   const handleDeleteLocation = React.useCallback(async (id: string) => {
-    if (!profile || id === 'default') return;
+    if (!profile || id === 'primary-node') return;
     const targetUid = profile.impersonatingUid || profile.uid;
-    const isActive = (profile?.activeLocationId || 'default') === id;
+    const isActive = (profile?.activeLocationId || 'primary-node') === id;
 
     try {
       if (isActive) {
@@ -292,10 +302,27 @@ export default function App() {
     refreshData();
   };
 
+  const handleUpdateTheme = async (uid: string, theme: any) => {
+    await inventoryService.updateProfile(uid, { theme });
+    refreshData();
+  };
+
   const handleUpdatePermissions = React.useCallback(async (uid: string, updates: any) => {
     await inventoryService.updateProfile(uid, updates);
     refreshData();
   }, [profile]);
+  
+  // Dynamic Branding Effect
+  React.useEffect(() => {
+    const theme = activeThemeProfile?.theme;
+    if (theme?.primaryColor) {
+      document.documentElement.style.setProperty('--primary-accent', theme.primaryColor);
+      document.documentElement.style.setProperty('--secondary-accent', '#C88D67');
+    } else {
+      document.documentElement.style.setProperty('--primary-accent', '#5A5A40');
+      document.documentElement.style.setProperty('--secondary-accent', '#C88D67');
+    }
+  }, [activeThemeProfile?.theme]);
 
   const handleDeleteTenant = async (uid: string) => {
     await inventoryService.deleteTenant(uid);
@@ -677,89 +704,58 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9F8F6] text-[#2D2A26] font-sans selection:bg-[#EBDCCB] pb-32 md:pb-12">
+    <div className="min-h-screen bg-[#F9F8F6] text-[#2D2A26] font-sans selection:bg-[#EBDCCB]">
       {/* Background Decorative Element */}
       <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-[#5A5A40]/5 rounded-full blur-[120px] -z-10 -translate-y-1/2 translate-x-1/2" />
-            {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-[100] bg-white/80 backdrop-blur-2xl border-b border-[#E8E2D9]">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3 md:gap-4 shrink-0">
-            <motion.div 
-              whileHover={{ rotate: 12 }}
-              className="w-10 h-10 md:w-12 md:h-12 rounded-[16px] bg-[#5A5A40] flex items-center justify-center text-white shadow-lg rotate-3"
-            >
-              <Coffee size={20} className="md:w-6 md:h-6" />
-            </motion.div>
-            <div>
-              <h1 className="text-lg md:text-xl font-serif font-semibold text-[#5A5A40] tracking-tight leading-none">Barista.OS</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[8px] md:text-[9px] text-[#8C857D] uppercase tracking-[0.2em] font-black block">Intelligence Hub</span>
-                {isSuperAdmin && (
-                  <span className="bg-[#C88D67] text-white px-1.5 py-0.5 rounded-[4px] text-[7px] font-black uppercase tracking-tighter">Superuser</span>
-                )}
-              </div>
-            </div>
-            
-            {profile?.impersonatingUid && (
-              <div className="ml-4 px-3 py-1 bg-red-100 text-red-600 rounded-lg text-[8px] font-black uppercase tracking-widest flex items-center gap-2">
-                <ShieldCheck size={12} />
-                Impersonating
-                <button onClick={() => handleImpersonate(null)} className="ml-2 hover:underline">Exit</button>
-              </div>
-            )}
-          </div>
-          
-          <div className="hidden lg:flex items-center gap-4">
-            <div className="flex items-center bg-[#F9F8F6]/50 p-1 rounded-[16px] border border-[#F0EBE4]">
-              {(isSuperAdmin || profile?.enabledTabs?.includes('dashboard')) && (
-                <NavTab active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={18}/>} label="Overview" />
-              )}
-              {(isSuperAdmin || profile?.enabledTabs?.includes('inventory')) && (
-                <NavTab active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} icon={<Package size={18}/>} label="Supply" />
-              )}
-              {(isSuperAdmin || profile?.enabledTabs?.includes('market')) && (
-                <NavTab active={activeTab === 'market'} onClick={() => setActiveTab('market')} icon={<TrendingUp size={18}/>} label="Pricing" />
-              )}
-              {(isSuperAdmin || profile?.enabledTabs?.includes('requisition')) && (
-                <NavTab active={activeTab === 'requisition'} onClick={() => setActiveTab('requisition')} icon={<ShoppingBag size={18}/>} label="Orders" />
-              )}
-              {(isSuperAdmin || profile?.enabledTabs?.includes('history')) && (
-                <NavTab active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History size={18}/>} label="Audits" />
-              )}
-              {isSuperAdmin && (
-                <NavTab active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon={<ShieldCheck size={18}/>} label="Super Admin" />
-              )}
-            </div>
+      
+      {/* Sidebar (Desktop Only) */}
+      <Sidebar 
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isSuperAdmin={isSuperAdmin}
+        profile={profile}
+        handleSignOut={handleSignOut}
+        setIsAddingItem={setIsAddingItem}
+        handleImpersonate={handleImpersonate}
+      />
 
-            <div className="h-8 w-px bg-[#E8E2D9]" />
+      {/* Mobile Header (Hidden on Desktop) */}
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[100] bg-white/80 backdrop-blur-2xl border-b border-[#E8E2D9]">
+        <div className="px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-10 h-10 rounded-[14px] bg-brand-primary flex items-center justify-center text-white shadow-lg rotate-3">
+              <Coffee size={20} />
+            </div>
+            <div>
+              <h1 className="text-lg font-serif font-semibold text-brand-primary tracking-tight leading-none">Barista.OS</h1>
+              <p className="text-[8px] text-[#8C857D] uppercase tracking-[0.2em] font-black mt-1">Intelligence Hub</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <motion.button 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleSignOut}
-              className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-full border border-[#E8E2D9] text-[#8C857D] hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all text-[10px] font-black uppercase tracking-widest"
-              title="End Session"
-            >
-              <X size={16} />
-              Logout
-            </motion.button>
             {(isSuperAdmin || profile?.permissions?.canAddItems) && (
               <motion.button 
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setIsAddingItem(true)}
-                className="bg-[#5A5A40] text-white px-4 py-2.5 md:px-6 md:py-3 rounded-[14px] md:rounded-full flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-[#5A5A40]/20"
+                className="bg-brand-primary text-white p-3 rounded-xl shadow-lg shadow-brand-primary/20"
               >
                 <Plus size={18} />
-                <span className="hidden sm:inline">New Item</span>
               </motion.button>
             )}
+            <motion.button 
+              whileTap={{ scale: 0.95 }}
+              onClick={handleSignOut}
+              className="text-[#8C857D] p-2"
+            >
+              <LogOut size={20} />
+            </motion.button>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-6 pt-28 pb-40 md:pb-32">
+      {/* Main Content Area */}
+      <div className="lg:ml-72 transition-all duration-300">
+        <main className="max-w-6xl mx-auto px-6 pt-28 lg:pt-16 pb-40 lg:pb-32">
         {/* System Status & Global Context Bar */}
         <div className="mb-12 py-8 px-12 bg-white border border-[#E8E2D9] rounded-[48px] shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-12">
           <div className="flex flex-col sm:flex-row sm:items-center gap-12">
@@ -768,7 +764,7 @@ export default function App() {
               <div className="flex items-center gap-6">
                 <div className="w-4 h-4 rounded-full bg-green-500 animate-pulse shadow-[0_0_20px_rgba(34,197,94,0.3)]" />
                 <div className="flex flex-col">
-                  <span className="text-4xl font-mono font-black text-[#5A5A40] leading-none tracking-tighter">
+                  <span className="text-4xl font-mono font-black text-brand-primary leading-none tracking-tighter">
                     {format(currentTime, 'HH:mm:ss')}
                   </span>
                   <div className="flex items-center gap-2 mt-2">
@@ -776,7 +772,7 @@ export default function App() {
                       {format(currentTime, 'EEEE, LLLL dd')}
                     </span>
                     <span className="w-1 h-1 rounded-full bg-[#E8E2D9]" />
-                    <span className="text-[10px] font-black text-[#5A5A40] uppercase tracking-tighter">Cortex v4.0 Active</span>
+                    <span className="text-[10px] font-black text-brand-primary uppercase tracking-tighter">Cortex v4.0 Active</span>
                   </div>
                 </div>
               </div>
@@ -810,17 +806,17 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
-              {locations.map(loc => {
-                const isActive = (profile?.activeLocationId || 'default') === loc.id;
+              {locations.map((loc, idx) => {
+                const isActive = (profile?.activeLocationId || 'primary-node') === loc.id;
                 return (
                   <button
-                    key={loc.id}
+                    key={`${loc.id}-${idx}`}
                     onClick={() => handleSwitchLocation(loc.id)}
                     className={cn(
                       "group relative min-w-[140px] p-4 rounded-[28px] border transition-all duration-300 text-left",
                       isActive 
-                        ? "bg-[#5A5A40] border-[#5A5A40] shadow-2xl shadow-[#5A5A40]/30 -translate-y-1" 
-                        : "bg-[#F9F8F6] border-[#E8E2D9] hover:border-[#5A5A40]/30 hover:bg-white"
+                        ? "bg-brand-primary border-brand-primary shadow-2xl shadow-brand-primary/30 -translate-y-1" 
+                        : "bg-[#F9F8F6] border-[#E8E2D9] hover:border-brand-primary/30 hover:bg-white"
                     )}
                   >
                     <div className="flex items-center justify-between mb-3">
@@ -828,7 +824,7 @@ export default function App() {
                         "p-2 rounded-xl transition-colors",
                         isActive ? "bg-white/10" : "bg-white border border-[#E8E2D9]"
                       )}>
-                        <MapPin size={14} className={isActive ? "text-white" : "text-[#5A5A40]"} />
+                        <MapPin size={14} className={isActive ? "text-white" : "text-brand-primary"} />
                       </div>
                       {isActive && (
                         <div className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]" />
@@ -836,7 +832,7 @@ export default function App() {
                     </div>
                     <p className={cn(
                       "text-[10px] font-black uppercase tracking-widest truncate",
-                      isActive ? "text-white" : "text-[#5A5A40]"
+                      isActive ? "text-white" : "text-brand-primary"
                     )}>
                       {loc.name}
                     </p>
@@ -866,7 +862,7 @@ export default function App() {
               chartData={chartData}
               topItemsData={topItemsData}
               onAction={handleOverviewAction}
-              isApproved={!!profile?.isApproved}
+              isApproved={!!profile?.isApproved} profile={profile}
             />
           )}
 
@@ -886,115 +882,15 @@ export default function App() {
           )}
 
           {activeTab === 'requisition' && (
-            <motion.div 
-              key="requisition"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              className="space-y-12"
-            >
-              <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                <div>
-                  <h2 className="text-5xl font-serif text-[#C88D67] italic lowercase leading-tight">replenishment queue.</h2>
-                  <p className="text-[10px] text-[#8C857D] font-black uppercase tracking-[0.2em] mt-3">Logistics Prioritization • {inventory.filter(i => i.quantity <= i.threshold).length} Active Depletions</p>
-                </div>
-              </header>
-
-              <div className="space-y-12">
-                {/* Critical Depletion (Zero) */}
-                {inventory.filter(i => i.quantity <= 0).length > 0 && (
-                  <section>
-                    <h3 className="text-[10px] font-black text-red-500 uppercase tracking-[0.4em] mb-6 flex items-center gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                      Immediate Depletion
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {inventory.filter(i => i.quantity <= 0).map(item => (
-                        <motion.div 
-                          layout
-                          key={item.id}
-                          className="bg-white border border-red-200 p-8 rounded-[40px] shadow-sm flex flex-col justify-between group transition-all hover:shadow-xl hover:border-red-400"
-                        >
-                          <div className="flex items-center justify-between mb-8">
-                            <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-red-500">
-                              <ShoppingBag size={28} />
-                            </div>
-                            <span className="text-[10px] font-black text-white bg-red-500 px-3 py-1.5 rounded-full uppercase tracking-widest">Out of Stock</span>
-                          </div>
-                          <div>
-                            <h4 className="text-2xl font-serif text-[#2D2A26] italic lowercase mb-2">{item.name}.</h4>
-                            <p className="text-[10px] text-[#8C857D] font-black uppercase tracking-widest mb-6">Source: {item.supplier || 'Unassigned'}</p>
-                            <button 
-                              onClick={() => {
-                                setManualRestock({ itemId: item.id, quantity: 10 });
-                                setRestockSource(item.supplier || '');
-                                setIsManualRestockOpen(true);
-                              }}
-                              className="w-full py-4 bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all active:scale-95"
-                            >
-                              Dispatch Order
-                            </button>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {/* Level Warning (Below threshold but above zero) */}
-                {inventory.filter(i => i.quantity > 0 && i.quantity <= i.threshold).length > 0 && (
-                  <section>
-                    <h3 className="text-[10px] font-black text-[#C88D67] uppercase tracking-[0.4em] mb-6 flex items-center gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#C88D67]" />
-                      Safety Margin Warnings
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {inventory.filter(i => i.quantity > 0 && i.quantity <= i.threshold).map(item => (
-                        <motion.div 
-                          layout
-                          key={item.id}
-                          className="bg-white border border-[#F0EBE4] p-8 rounded-[40px] shadow-sm flex flex-col justify-between group transition-all hover:shadow-lg hover:border-[#C88D67]/30"
-                        >
-                          <div className="flex items-center justify-between mb-8">
-                            <div className="w-14 h-14 rounded-2xl bg-[#FDFBF9] border border-[#F0EBE4] flex items-center justify-center text-[#C88D67]">
-                              <AlertCircle size={28} />
-                            </div>
-                            <span className="text-[10px] font-black text-[#C88D67] bg-[#FDFBF9] border border-[#FCEEE0] px-3 py-1.5 rounded-full uppercase tracking-widest">Low Stock</span>
-                          </div>
-                          <div>
-                            <h4 className="text-2xl font-serif text-[#2D2A26] italic lowercase mb-1">{item.name}.</h4>
-                            <div className="flex items-baseline gap-2 mb-6">
-                              <span className="text-3xl font-mono font-bold text-[#2D2A26]">{item.quantity}</span>
-                              <span className="text-[10px] text-[#8C857D] font-black uppercase tracking-widest">/ limit {item.threshold} {item.unit}</span>
-                            </div>
-                            <button 
-                              onClick={() => {
-                                setManualRestock({ itemId: item.id, quantity: Math.max(1, item.threshold * 2) });
-                                setRestockSource(item.supplier || '');
-                                setIsManualRestockOpen(true);
-                              }}
-                              className="w-full py-4 bg-[#C88D67] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#C88D67]/20 hover:bg-[#B57C5A] transition-all active:scale-95"
-                            >
-                              Procure Surplus
-                            </button>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {inventory.filter(i => i.quantity <= i.threshold).length === 0 && (
-                  <div className="py-40 text-center">
-                    <div className="w-24 h-24 rounded-full bg-[#F9F8F6] flex items-center justify-center mx-auto mb-8 border border-[#E8E2D9]">
-                      <Package size={40} className="text-[#5A5A40] opacity-20" />
-                    </div>
-                    <h3 className="font-serif text-3xl text-[#5A5A40] italic mb-4">Stock Integrity Maintained.</h3>
-                    <p className="text-[10px] text-[#8C857D] font-black uppercase tracking-[0.2em]">All assets are currently above safety thresholds</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
+            <RequisitionQueue
+              inventory={inventory}
+              salesHistory={salesHistory}
+              onDispatchOrder={(itemId, quantity, supplier) => {
+                setManualRestock({ itemId, quantity });
+                setRestockSource(supplier || '');
+                setIsManualRestockOpen(true);
+              }}
+            />
           )}
 
           {activeTab === 'history' && (
@@ -1022,10 +918,12 @@ export default function App() {
               handleUpdateTabs={handleUpdateTabs}
               handleApproveTenant={handleApproveTenant}
               handleDeleteTenant={handleDeleteTenant}
+              handleUpdateTheme={handleUpdateTheme}
             />
           )}
         </AnimatePresence>
       </main>
+    </div>
 
       {/* Persistent Quick Controls FAB & Mobile Bottom Nav */}
       <div className="fixed bottom-0 left-0 right-0 z-[110] lg:hidden">
@@ -1453,12 +1351,21 @@ export default function App() {
             if (cameraPurpose === 'sale') {
               const event = { target: { files: [file] } } as any;
               handleFileUpload(event);
+            } else if (cameraPurpose === 'intel') {
+              const event = { target: { files: [file] } } as any;
+              handleProductIntelFileUpload(event);
             } else {
               const event = { target: { files: [file] } } as any;
               handleRestockFileUpload(event);
             }
           }}
-          title={cameraPurpose === 'sale' ? "Capture Sale Sheet" : "Capture Restock Receipt"}
+          title={
+            cameraPurpose === 'sale' 
+              ? "Capture Sale Sheet" 
+              : cameraPurpose === 'intel' 
+                ? "Capture Product for Intel" 
+                : "Capture Restock Receipt"
+          }
         />
 
         {isResourceIntelOpen && (
@@ -1479,10 +1386,22 @@ export default function App() {
                       </div>
                       <p className="font-serif text-2xl mb-3 lowercase italic text-white/90">identify resource.</p>
                       <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-black mb-10 max-w-[200px]">Photo any ingredient to see composition & alternatives</p>
-                      <label className="bg-white text-[#5A5A40] px-10 py-4 rounded-2xl cursor-pointer text-[10px] font-black uppercase tracking-widest hover:bg-[#F9F8F6] active:scale-95 transition-all shadow-2xl">
-                        Snapshot Product
-                        <input type="file" accept="image/*" className="hidden" onChange={handleProductIntelFileUpload} />
-                      </label>
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <button 
+                          onClick={() => {
+                            setCameraPurpose('intel');
+                            setIsCameraOpen(true);
+                          }}
+                          className="bg-white text-[#5A5A40] px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#F9F8F6] active:scale-95 transition-all shadow-2xl flex items-center gap-2"
+                        >
+                          <Camera size={14} />
+                          Tap to Snap
+                        </button>
+                        <label className="bg-white/10 text-white border border-white/20 px-10 py-4 rounded-2xl cursor-pointer text-[10px] font-black uppercase tracking-widest hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center">
+                          Upload File
+                          <input type="file" accept="image/*" className="hidden" onChange={handleProductIntelFileUpload} />
+                        </label>
+                      </div>
                     </div>
                   )}
                 </div>

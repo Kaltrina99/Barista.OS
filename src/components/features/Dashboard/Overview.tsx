@@ -12,6 +12,7 @@ import {
   Bell
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { calculateSubscriptionPrice } from '../../../utils/pricing';
 import { 
   AreaChart, 
   Area, 
@@ -36,6 +37,7 @@ interface OverviewProps {
   topItemsData: any[];
   onAction: (action: 'sales' | 'restock' | 'intel' | 'requisition') => void;
   isApproved: boolean;
+  profile?: any;
 }
 
 export const Overview = memo(({ 
@@ -45,7 +47,8 @@ export const Overview = memo(({
   chartData, 
   topItemsData, 
   onAction,
-  isApproved
+  isApproved,
+  profile
 }: OverviewProps) => {
   return (
     <motion.div 
@@ -67,10 +70,24 @@ export const Overview = memo(({
 
       <header className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div className="max-w-md">
-          <h2 className="text-5xl font-serif font-light text-[#5A5A40] leading-tight mb-4 lowercase italic">stock oversight.</h2>
+          <h2 className="text-5xl font-serif font-light text-brand-primary leading-tight mb-4 lowercase italic">stock oversight.</h2>
           <p className="text-sm text-[#8C857D] font-medium leading-relaxed">
             AI-powered logistics for boutique hospitality. Real-time movement tracking and predictive threshold analysis.
           </p>
+          {profile && (
+            (() => {
+              const pricing = calculateSubscriptionPrice(profile);
+              return (
+                <div className="mt-4 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-primary/[0.03] border border-brand-primary/15 text-[9px] text-brand-primary font-black uppercase tracking-wider">
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse" />
+                  <span>
+                    Price Plan: {pricing.isSuperAdmin ? 'Superuser Free-tier' : 
+                     pricing.isFreeByConfig ? 'Gifted Waiver ($0.00/mo)' : `Active features package ($${pricing.total.toFixed(2)}/mo)`}
+                  </span>
+                </div>
+              );
+            })()
+          )}
         </div>
         <div className="flex items-center gap-6">
           {criticalItems.length > 0 && (
@@ -141,7 +158,7 @@ export const Overview = memo(({
         <div className="lg:col-span-2 bg-white border border-[#E8E2D9] rounded-[40px] p-8 shadow-sm group">
           <div className="flex items-center justify-between mb-10">
             <div>
-              <h4 className="font-serif text-xl text-[#5A5A40] mb-1 italic">Volume Dynamics</h4>
+              <h4 className="font-serif text-xl text-brand-primary mb-1 italic">Volume Dynamics</h4>
               <p className="text-[10px] text-[#8C857D] uppercase tracking-[0.2em] font-black">7-Day Trajectory</p>
             </div>
           </div>
@@ -150,11 +167,11 @@ export const Overview = memo(({
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorUnits" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#5A5A40" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#5A5A40" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--primary-accent)" stopOpacity={0.15}/>
+                    <stop offset="95%" stopColor="var(--primary-accent)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="5 5" vertical={false} stroke="#F0F0F0" />
+                <CartesianGrid strokeDasharray="5 5" vertical={false} stroke="#E8E2D9" strokeOpacity={0.5} />
                 <XAxis 
                   dataKey="name" 
                   axisLine={false} 
@@ -169,7 +186,7 @@ export const Overview = memo(({
                 <Area 
                   type="monotone" 
                   dataKey="units" 
-                  stroke="#5A5A40" 
+                  stroke="var(--primary-accent)" 
                   strokeWidth={4}
                   fillOpacity={1} 
                   fill="url(#colorUnits)" 
@@ -179,25 +196,25 @@ export const Overview = memo(({
           </div>
         </div>
 
-        <div className="bg-[#FFF9F4] border border-[#FCEEE0] rounded-[40px] p-8 shadow-sm flex flex-col h-full">
-          <h4 className="font-serif text-xl text-[#5A5A40] mb-8 italic">Popular Demand</h4>
+        <div className="bg-brand-secondary/5 border border-brand-secondary/10 rounded-[40px] p-8 shadow-sm flex flex-col h-full text-brand-secondary">
+          <h4 className="font-serif text-xl text-brand-primary mb-8 italic lowercase">Popular Demand</h4>
           <div className="flex-1 min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topItemsData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#FCEEE0" />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--secondary-accent)" strokeOpacity={0.1} />
                 <XAxis type="number" hide />
                 <YAxis 
                   dataKey="name" 
                   type="category" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fontSize: 10, fill: '#5A5A40', fontWeight: 800, textTransform: 'uppercase' }}
+                  tick={{ fontSize: 10, fill: 'var(--primary-accent)', fontWeight: 800, textTransform: 'uppercase' }}
                   width={90}
                 />
-                <Tooltip cursor={{ fill: 'rgba(200, 141, 103, 0.05)' }} contentStyle={{ borderRadius: '16px' }} />
+                <Tooltip cursor={{ fill: 'rgba(0, 0, 0, 0.02)' }} contentStyle={{ borderRadius: '16px' }} />
                 <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={24}>
                   {topItemsData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#C88D67' : '#5A5A40'} />
+                    <Cell key={`cell-${index}`} fill={index === 0 ? 'var(--secondary-accent)' : 'var(--primary-accent)'} />
                   ))}
                 </Bar>
               </BarChart>

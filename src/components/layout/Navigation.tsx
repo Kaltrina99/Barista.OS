@@ -7,7 +7,7 @@ export const NavTab = ({ active, onClick, icon, label }: { active: boolean; onCl
     onClick={onClick}
     className={cn(
       "flex items-center gap-2.5 px-6 py-2.5 rounded-[12px] transition-all duration-300 relative group",
-      active ? "text-[#5A5A40] font-bold" : "text-[#8C857D] hover:text-[#5A5A40] font-medium"
+      active ? "text-brand-primary font-bold" : "text-[#8C857D] hover:text-brand-primary font-medium"
     )}
   >
     {active && (
@@ -28,7 +28,7 @@ export const MobileNavTab = ({ active, onClick, icon, label }: { active: boolean
     onClick={onClick}
     className={cn(
       "flex flex-col items-center gap-1.5 p-3 rounded-2xl transition-all relative",
-      active ? "text-[#5A5A40]" : "text-[#8C857D]"
+      active ? "text-brand-primary" : "text-[#8C857D]"
     )}
   >
     {active && (

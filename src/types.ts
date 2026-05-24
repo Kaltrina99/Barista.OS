@@ -70,6 +70,12 @@ export interface StockHistoryRecord {
 export type SubscriptionTier = 'free' | 'basic' | 'pro' | 'enterprise';
 export type AppTab = 'dashboard' | 'inventory' | 'market' | 'requisition' | 'history';
 
+export interface AppTheme {
+  primaryColor: string; // Tailwind color key or hex
+  fontFamily?: 'serif' | 'sans' | 'mono';
+  brandName?: string;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -81,7 +87,8 @@ export interface UserProfile {
   lastActive: string;
   impersonatingUid?: string; // For superadmin support
   enabledTabs?: AppTab[]; // Admin controlled access
-    permissions?: {
+  theme?: AppTheme;
+  permissions?: {
       dashboard: boolean;
       inventory: boolean;
       market: boolean;

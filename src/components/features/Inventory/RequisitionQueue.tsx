@@ -1,19 +1,64 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ShoppingBag, AlertCircle, Package } from 'lucide-react';
-import { InventoryItem } from '../../../types';
+import { ShoppingBag, AlertCircle, Package, TrendingUp } from 'lucide-react';
+import { InventoryItem, SalesRecord } from '../../../types';
 
 interface RequisitionQueueProps {
   inventory: InventoryItem[];
-  onManualRestock: (itemId: string, quantity: number, supplier: string) => void;
+  salesHistory: SalesRecord[];
+  onDispatchOrder: (itemId: string, quantity: number, supplier: string) => void;
 }
 
 export const RequisitionQueue: React.FC<RequisitionQueueProps> = ({
   inventory,
-  onManualRestock
+  salesHistory,
+  onDispatchOrder
 }) => {
   const criticalItems = inventory.filter(i => i.quantity <= 0);
   const lowStockItems = inventory.filter(i => i.quantity > 0 && i.quantity <= i.threshold);
+
+  // Helper to calculate average consumption & recommended quantity
+  const getConsumptionMetrics = (item: InventoryItem) => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Filter sales records from the last 7 days
+    const recentSales = (salesHistory || []).filter(sale => {
+      const saleDate = new Date(sale.timestamp);
+      return saleDate >= sevenDaysAgo;
+    });
+
+    // Sum up the quantity sold for this specific item
+    let totalSoldIn7Days = 0;
+    recentSales.forEach(sale => {
+      if (sale.itemsSold) {
+        sale.itemsSold.forEach(sold => {
+          if (
+            sold.name.toLowerCase() === item.name.toLowerCase() ||
+            sold.name.toLowerCase().includes(item.name.toLowerCase()) ||
+            item.name.toLowerCase().includes(sold.name.toLowerCase())
+          ) {
+            totalSoldIn7Days += sold.quantity;
+          }
+        });
+      }
+    });
+
+    const avgDailyConsumption = totalSoldIn7Days / 7;
+    
+    // Suggest order quantity of: 7-day supply (minimum of safety threshold or 10 units)
+    const suggested7DaySupply = Math.ceil(avgDailyConsumption * 7);
+    const recommendedQty = suggested7DaySupply > 0 
+      ? Math.max(item.threshold, suggested7DaySupply)
+      : Math.max(10, item.threshold * 2);
+
+    return {
+      totalSoldIn7Days,
+      avgDailyConsumption,
+      recommendedQty,
+      hasRecentSales: totalSoldIn7Days > 0
+    };
+  };
 
   return (
     <motion.div 
@@ -38,30 +83,56 @@ export const RequisitionQueue: React.FC<RequisitionQueueProps> = ({
               Immediate Depletion
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {criticalItems.map(item => (
-                <motion.div 
-                  layout
-                  key={item.id}
-                  className="bg-white border border-red-200 p-8 rounded-[40px] shadow-sm flex flex-col justify-between group transition-all hover:shadow-xl hover:border-red-400"
-                >
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-red-500">
-                      <ShoppingBag size={28} />
+              {criticalItems.map((item, idx) => {
+                const metrics = getConsumptionMetrics(item);
+                return (
+                  <motion.div 
+                    layout
+                    key={`${item.id}-${idx}`}
+                    className="bg-white border border-red-200 p-8 rounded-[40px] shadow-sm flex flex-col justify-between group transition-all hover:shadow-xl hover:border-red-400"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-8">
+                        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-red-500">
+                          <ShoppingBag size={28} />
+                        </div>
+                        <span className="text-[10px] font-black text-white bg-red-500 px-3 py-1.5 rounded-full uppercase tracking-widest">Out of Stock</span>
+                      </div>
+                      <h4 className="text-2xl font-serif text-[#2D2A26] italic lowercase mb-2">{item.name}.</h4>
+                      <p className="text-[10px] text-[#8C857D] font-black uppercase tracking-widest mb-6">Source: {item.supplier || 'Unassigned'}</p>
+
+                      {/* AI-driven Recommended Order Section */}
+                      <div className="mb-6 p-4 bg-[#FFF5F5] border border-red-100 rounded-[24px]">
+                        <div className="flex items-center gap-2 mb-3 text-red-600">
+                          <TrendingUp size={16} />
+                          <span className="text-[10px] font-black uppercase tracking-wider">Replenishment Intel</span>
+                        </div>
+                        <div className="space-y-2 text-xs">
+                          <div className="flex justify-between text-[#8C857D] font-medium">
+                            <span>Last 7d Sales:</span>
+                            <span className="font-mono text-[#2D2A26] font-semibold">{metrics.totalSoldIn7Days} {item.unit}s</span>
+                          </div>
+                          <div className="flex justify-between text-[#8C857D] font-medium">
+                            <span>Daily Velocity:</span>
+                            <span className="font-mono text-[#2D2A26] font-semibold">{metrics.avgDailyConsumption.toFixed(2)} / day</span>
+                          </div>
+                          <div className="border-t border-red-100 my-2 pt-2 flex justify-between text-red-600 font-bold items-center">
+                            <span className="text-[10px] uppercase font-black tracking-wider">Suggested Order:</span>
+                            <span className="font-mono text-base">{metrics.recommendedQty} {item.unit}s</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-black text-white bg-red-500 px-3 py-1.5 rounded-full uppercase tracking-widest">Out of Stock</span>
-                  </div>
-                  <div>
-                    <h4 className="text-2xl font-serif text-[#2D2A26] italic lowercase mb-2">{item.name}.</h4>
-                    <p className="text-[10px] text-[#8C857D] font-black uppercase tracking-widest mb-6">Source: {item.supplier || 'Unassigned'}</p>
+
                     <button 
-                      onClick={() => onManualRestock(item.id, 10, item.supplier || '')}
+                      onClick={() => onDispatchOrder(item.id, metrics.recommendedQty, item.supplier || '')}
                       className="w-full py-4 bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all active:scale-95"
                     >
-                      Dispatch Order
+                      Dispatch Recommended Order ({metrics.recommendedQty})
                     </button>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           </section>
         )}
@@ -74,33 +145,59 @@ export const RequisitionQueue: React.FC<RequisitionQueueProps> = ({
               Safety Margin Warnings
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {lowStockItems.map(item => (
-                <motion.div 
-                  layout
-                  key={item.id}
-                  className="bg-white border border-[#F0EBE4] p-8 rounded-[40px] shadow-sm flex flex-col justify-between group transition-all hover:shadow-lg hover:border-[#C88D67]/30"
-                >
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="w-14 h-14 rounded-2xl bg-[#FDFBF9] border border-[#F0EBE4] flex items-center justify-center text-[#C88D67]">
-                      <AlertCircle size={28} />
+              {lowStockItems.map((item, idx) => {
+                const metrics = getConsumptionMetrics(item);
+                return (
+                  <motion.div 
+                    layout
+                    key={`${item.id}-${idx}`}
+                    className="bg-white border border-[#F0EBE4] p-8 rounded-[40px] shadow-sm flex flex-col justify-between group transition-all hover:shadow-lg hover:border-[#C88D67]/30"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-8">
+                        <div className="w-14 h-14 rounded-2xl bg-[#FDFBF9] border border-[#F0EBE4] flex items-center justify-center text-[#C88D67]">
+                          <AlertCircle size={28} />
+                        </div>
+                        <span className="text-[10px] font-black text-[#C88D67] bg-[#FDFBF9] border border-[#FCEEE0] px-3 py-1.5 rounded-full uppercase tracking-widest">Low Stock</span>
+                      </div>
+                      <h4 className="text-2xl font-serif text-[#2D2A26] italic lowercase mb-1">{item.name}.</h4>
+                      <div className="flex items-baseline gap-2 mb-6">
+                        <span className="text-3xl font-mono font-bold text-[#2D2A26]">{item.quantity}</span>
+                        <span className="text-[10px] text-[#8C857D] font-black uppercase tracking-widest">/ limit {item.threshold} {item.unit}</span>
+                      </div>
+
+                      {/* AI-driven Recommended Order Section */}
+                      <div className="mb-6 p-4 bg-[#F9F8F6] border border-[#E8E2D9] rounded-[24px]">
+                        <div className="flex items-center gap-2 mb-3 text-[#5A5A40]">
+                          <TrendingUp size={16} />
+                          <span className="text-[10px] font-black uppercase tracking-wider">Replenishment Intel</span>
+                        </div>
+                        <div className="space-y-2 text-xs">
+                          <div className="flex justify-between text-[#8C857D] font-medium">
+                            <span>Last 7d Sales:</span>
+                            <span className="font-mono text-[#2D2A26] font-semibold">{metrics.totalSoldIn7Days} {item.unit}s</span>
+                          </div>
+                          <div className="flex justify-between text-[#8C857D] font-medium">
+                            <span>Daily Velocity:</span>
+                            <span className="font-mono text-[#2D2A26] font-semibold">{metrics.avgDailyConsumption.toFixed(2)} / day</span>
+                          </div>
+                          <div className="border-t border-[#E8E2D9] my-2 pt-2 flex justify-between text-[#A06D44] font-bold items-center">
+                            <span className="text-[10px] uppercase font-black tracking-wider">Suggested Order:</span>
+                            <span className="font-mono text-base">{metrics.recommendedQty} {item.unit}s</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-black text-[#C88D67] bg-[#FDFBF9] border border-[#FCEEE0] px-3 py-1.5 rounded-full uppercase tracking-widest">Low Stock</span>
-                  </div>
-                  <div>
-                    <h4 className="text-2xl font-serif text-[#2D2A26] italic lowercase mb-1">{item.name}.</h4>
-                    <div className="flex items-baseline gap-2 mb-6">
-                      <span className="text-3xl font-mono font-bold text-[#2D2A26]">{item.quantity}</span>
-                      <span className="text-[10px] text-[#8C857D] font-black uppercase tracking-widest">/ limit {item.threshold} {item.unit}</span>
-                    </div>
+
                     <button 
-                      onClick={() => onManualRestock(item.id, Math.max(1, item.threshold * 2), item.supplier || '')}
+                      onClick={() => onDispatchOrder(item.id, metrics.recommendedQty, item.supplier || '')}
                       className="w-full py-4 bg-[#C88D67] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#C88D67]/20 hover:bg-[#B57C5A] transition-all active:scale-95"
                     >
-                      Procure Surplus
+                      Procure Suggested ({metrics.recommendedQty})
                     </button>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           </section>
         )}

@@ -16,7 +16,7 @@ export const InventoryRow = memo(({ item, onEdit, onDelete, onViewPriceHistory, 
   return (
     <div 
       className={cn(
-        "p-10 bg-white border border-[#E8E2D9] rounded-[48px] hover:border-[#5A5A40] transition-all group relative overflow-hidden",
+        "p-10 bg-white border border-[#E8E2D9] rounded-[48px] hover:border-brand-primary transition-all group relative overflow-hidden",
         item.quantity <= item.threshold ? "bg-red-50/30 border-red-100" : ""
       )}
     >
@@ -24,7 +24,7 @@ export const InventoryRow = memo(({ item, onEdit, onDelete, onViewPriceHistory, 
         <div className="flex items-center gap-8">
           <div className={cn(
             "w-20 h-20 rounded-[32px] flex items-center justify-center transition-all group-hover:scale-105",
-            item.quantity <= item.threshold ? "bg-red-100 text-red-600" : "bg-[#F9F8F6] text-[#5A5A40]"
+            item.quantity <= item.threshold ? "bg-red-100 text-red-600" : "bg-[#F9F8F6] text-brand-primary"
           )}>
             <Package size={32} />
           </div>
@@ -51,14 +51,14 @@ export const InventoryRow = memo(({ item, onEdit, onDelete, onViewPriceHistory, 
             <button 
               onClick={() => onViewPriceHistory(item)}
               title="Price History"
-              className="w-14 h-14 rounded-3xl border border-[#E8E2D9] flex items-center justify-center text-[#C88D67] hover:border-[#C88D67] hover:text-[#C88D67] hover:bg-white transition-all bg-[#FDFBF9]"
+              className="w-14 h-14 rounded-3xl border border-[#E8E2D9] flex items-center justify-center text-brand-secondary hover:border-brand-secondary hover:text-brand-secondary hover:bg-white transition-all bg-[#FDFBF9]"
             >
               <LineChart size={20} />
             </button>
             {canEdit && (
               <button 
                 onClick={() => onEdit(item)}
-                className="w-14 h-14 rounded-3xl border border-[#E8E2D9] flex items-center justify-center text-[#8C857D] hover:border-[#5A5A40] hover:text-[#5A5A40] hover:bg-white transition-all bg-[#FDFBF9]"
+                className="w-14 h-14 rounded-3xl border border-[#E8E2D9] flex items-center justify-center text-[#8C857D] hover:border-brand-primary hover:text-brand-primary hover:bg-white transition-all bg-[#FDFBF9]"
               >
                 <Edit3 size={20} />
               </button>

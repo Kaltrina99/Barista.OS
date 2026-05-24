@@ -11,13 +11,47 @@ dotenv.config();
 // Initialize Firebase Admin if environment variables are present
 let dbAdmin: admin.firestore.Firestore | null = null;
 
+const cleanEnvVar = (val: string | undefined) => {
+  if (!val) return "";
+  // In some environments, the private key is passed with literal \n escapes
+  // but in others, they are already actual newlines.
+  let cleaned = val.replace(/\\n/g, '\n');
+  
+  // Remove wrapping quotes (if any)
+  cleaned = cleaned.trim();
+  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+    cleaned = cleaned.substring(1, cleaned.length - 1);
+  } else if (cleaned.startsWith("'") && cleaned.endsWith("'")) {
+    cleaned = cleaned.substring(1, cleaned.length - 1);
+  }
+  
+  // Re-encode existing newlines just to be sure we have a clean string for cert()
+  // but actually cert() expects the literal newline characters in a string.
+  return cleaned;
+};
+
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
   try {
+    const projectId = cleanEnvVar(process.env.FIREBASE_PROJECT_ID);
+    const clientEmail = cleanEnvVar(process.env.FIREBASE_CLIENT_EMAIL);
+    let privateKey = cleanEnvVar(process.env.FIREBASE_PRIVATE_KEY);
+    
+    // Crucial: The private key must have the correct headers and contain newlines
+    if (privateKey && !privateKey.includes("-----BEGIN PRIVATE KEY-----")) {
+      // If it looks like a base64 key without headers, we can try to wrap it
+      // but usually service account keys come with headers.
+      // If headers are missing, we add them.
+      privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----`;
+    }
+    
+    // Ensure actual newlines (some platforms strip them)
+    privateKey = privateKey.replace(/\n/g, '\n');
+
     admin.initializeApp({
       credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        projectId,
+        clientEmail,
+        privateKey,
       }),
     });
     dbAdmin = admin.firestore();
@@ -33,6 +67,18 @@ const PORT = 3000;
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 
+// Global error handler for API routes to ensure JSON response instead of HTML
+const apiErrorHandler: express.ErrorRequestHandler = (err, req, res, next) => {
+  console.error("API Error Handler:", err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(err.status || 500).json({
+    error: err.message || "Internal Server Error",
+    path: req.originalUrl
+  });
+};
+
 // Storage Abstraction (Fulfilling "not relay havely on google" by allowing local storage fallback)
 // In a real production app, we'd use a real DB, but for "running from VS Code" easily, 
 // a local JSON file is very portable.
@@ -42,23 +88,42 @@ fs.ensureDirSync(DATA_DIR);
 const getStoragePath = (uid: string, category: string) => path.join(DATA_DIR, uid, `${category}.json`);
 
 async function getData(uid: string, category: string) {
+  let results: any[] = [];
   // Try Firebase first if admin is available
   if (dbAdmin) {
     try {
       const snapshot = await dbAdmin.collection(category).get();
       if (!snapshot.empty) {
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
-    } catch (e) {
-      console.warn(`Firestore read failed for ${category}, falling back to local:`, e);
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      if (msg.includes("UNAUTHENTICATED") || e?.code === 16) {
+        console.info("[Firebase Storage Hub] Missing or expired Google Cloud credentials in environment. Fallback to local file persistence mode enabled.");
+        dbAdmin = null;
+      } else {
+        console.warn(`Firestore read failed for ${category}, falling back to local:`, msg);
+      }
     }
   }
 
-  const filePath = getStoragePath(uid, category);
-  if (await fs.pathExists(filePath)) {
-    return fs.readJSON(filePath);
+  if (results.length === 0) {
+    const filePath = getStoragePath(uid, category);
+    if (await fs.pathExists(filePath)) {
+      results = await fs.readJSON(filePath);
+    }
   }
-  return [];
+
+  // Final deduplication by ID before returning to frontend
+  const dedupeMap = new Map();
+  results.forEach(item => {
+    if (item && item.id) {
+      dedupeMap.set(item.id, item);
+    } else if (item && item.uid) {
+      dedupeMap.set(item.uid, item);
+    }
+  });
+  return Array.from(dedupeMap.values());
 }
 
 async function saveData(uid: string, category: string, data: any) {
@@ -212,19 +277,37 @@ apiRouter.post("/inventory", async (req, res) => {
 apiRouter.get("/tenants", async (req, res) => {
   try {
     if (dbAdmin) {
-      const snapshot = await dbAdmin.collection("profiles").get();
-      const tenants = snapshot.docs.map(doc => doc.data());
-      return res.json(tenants);
+      try {
+        const snapshot = await dbAdmin.collection("profiles").get();
+        const tenantMap = new Map();
+        snapshot.docs.forEach(doc => {
+          tenantMap.set(doc.id, { uid: doc.id, ...doc.data() });
+        });
+        return res.json(Array.from(tenantMap.values()));
+      } catch (fbError: any) {
+        const msg = fbError?.message || String(fbError);
+        if (msg.includes("UNAUTHENTICATED") || fbError?.code === 16) {
+          console.info("[Firebase Storage Hub] Missing or expired Google Cloud credentials in environment. Fallback to local file persistence mode enabled.");
+          dbAdmin = null;
+        } else {
+          console.warn("Firestore Admin profiles fetch failed, falling back to local files:", msg);
+        }
+      }
     }
     const profilesDir = path.join(DATA_DIR, 'profiles');
     if (await fs.pathExists(profilesDir)) {
       const files = await fs.readdir(profilesDir);
-      const profiles = await Promise.all(
+      const tenantMap = new Map();
+      await Promise.all(
         files
           .filter(f => f.endsWith('.json'))
-          .map(f => fs.readJSON(path.join(profilesDir, f)))
+          .map(async (f) => {
+            const uid = f.replace('.json', '');
+            const data = await fs.readJSON(path.join(profilesDir, f));
+            tenantMap.set(uid, { uid, ...data });
+          })
       );
-      return res.json(profiles);
+      return res.json(Array.from(tenantMap.values()));
     }
     res.json([]);
   } catch (error) {
@@ -242,6 +325,9 @@ apiRouter.all("/auth/google", async (req, res) => {
 
 // Implementation of the suggested router pattern
 app.use("/api", apiRouter);
+
+// API Error Handler - must be after the router
+apiRouter.use(apiErrorHandler);
 
 // Catch-all for missing API routes to prevent HTML fallout
 app.all("/api/*", (req, res) => {
